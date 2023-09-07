@@ -1,8 +1,7 @@
-module github.com/jpillora/go-tcp-proxy
+module github.com/kengou/go-tcp-proxy
 
-go 1.13
+go 1.21.0
 
-require (
-	github.com/mattn/go-colorable v0.1.4 // indirect
-	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
-)
+require k8s.io/klog/v2 v2.100.1
+
+require github.com/go-logr/logr v1.2.4 // indirect

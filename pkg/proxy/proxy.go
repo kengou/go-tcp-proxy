@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+
+	"k8s.io/klog/v2"
 )
 
 // Proxy - Manages a Proxy connection, piping data between local and remote.
@@ -22,7 +24,6 @@ type Proxy struct {
 
 	// Settings
 	Nagles    bool
-	Log       Logger
 	OutputHex bool
 }
 
@@ -35,7 +36,6 @@ func New(lconn *net.TCPConn, laddr, raddr *net.TCPAddr) *Proxy {
 		raddr:  raddr,
 		erred:  false,
 		errsig: make(chan bool),
-		Log:    NullLogger{},
 	}
 }
 
@@ -65,7 +65,7 @@ func (p *Proxy) Start() {
 		p.rconn, err = net.DialTCP("tcp", nil, p.raddr)
 	}
 	if err != nil {
-		p.Log.Warn("Remote connection failed: %s", err)
+		klog.Errorf("Remote connection failed: %s", err)
 		return
 	}
 	defer p.rconn.Close()
@@ -81,7 +81,7 @@ func (p *Proxy) Start() {
 	}
 
 	//display both ends
-	p.Log.Info("Opened %s >>> %s", p.laddr.String(), p.raddr.String())
+	klog.Infof("Opened %s >>> %s", p.laddr.String(), p.raddr.String())
 
 	//bidirectional copy
 	go p.pipe(p.lconn, p.rconn)
@@ -89,7 +89,7 @@ func (p *Proxy) Start() {
 
 	//wait for close...
 	<-p.errsig
-	p.Log.Info("Closed (%d bytes sent, %d bytes recieved)", p.sentBytes, p.receivedBytes)
+	klog.Infof("Closed (%d bytes sent, %d bytes recieved)", p.sentBytes, p.receivedBytes)
 }
 
 func (p *Proxy) err(s string, err error) {
@@ -97,7 +97,7 @@ func (p *Proxy) err(s string, err error) {
 		return
 	}
 	if err != io.EOF {
-		p.Log.Warn(s, err)
+		klog.Errorf(s, err)
 	}
 	p.errsig <- true
 	p.erred = true
@@ -141,8 +141,8 @@ func (p *Proxy) pipe(src, dst io.ReadWriter) {
 		}
 
 		//show output
-		p.Log.Debug(dataDirection, n, "")
-		p.Log.Trace(byteFormat, b)
+		klog.V(5).Infof(dataDirection, n, "")
+		klog.V(5).Infof(byteFormat, b)
 
 		//write out result
 		n, err = dst.Write(b)
