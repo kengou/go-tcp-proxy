@@ -4,18 +4,11 @@ A small TCP proxy written in Go
 
 This project was intended for debugging text-based protocols. The next version will address binary protocols.
 
-## Install
-
-**Binaries**
-
-Download [the latest release](https://github.com/jpillora/go-tcp-proxy/releases/latest), or
-
-Install latest release now with `curl https://i.jpillora.com/go-tcp-proxy! | bash`
 
 **Source**
 
 ``` sh
-$ go get -v github.com/jpillora/go-tcp-proxy/cmd/tcp-proxy
+$ go get -v github.com/kengou/go-tcp-proxy/cmd
 ```
 
 ## Usage
@@ -30,8 +23,6 @@ Usage of tcp-proxy:
   -r="localhost:80": remote address
   -match="": match regex (in the form 'regex')
   -replace="": replace regex (in the form 'regex~replacer')
-  -v: display server actions
-  -vv: display server actions and all tcp data
 ```
 
 *Note: Regex match and replace*
