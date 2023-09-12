@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -25,7 +26,7 @@ func setupMetricsServer(metricAddress string) *http.Server {
 	return &srv
 }
 
-func (p *MetricsHelper) StartMetricsServer(metricsAddr string) error {
+func (p *MetricsHelper) StartMetricsServer(metricsAddr string) {
 	p.metricsServer = setupMetricsServer(metricsAddr)
 
 	klog.Infof("started: prometheus metrics server on %s", metricsAddr)
@@ -33,9 +34,9 @@ func (p *MetricsHelper) StartMetricsServer(metricsAddr string) error {
 	err := p.metricsServer.ListenAndServe()
 	if err != http.ErrServerClosed {
 		// Error starting or closing listener
-		return err
+		klog.Errorf("error starting prometheus metrics server: %s", err)
+		os.Exit(1)
 	}
-	return nil
 }
 
 func (p *MetricsHelper) StopMetricsServer() error {

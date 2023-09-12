@@ -63,10 +63,8 @@ func main() {
 	replacer := createReplacer(*replace)
 
 	prom := metrics.MetricsHelper{}
-	if err := prom.StartMetricsServer(*metricAddress); err != nil {
-		klog.Errorf("Failed to start metrics server: %s", err)
-		os.Exit(1)
-	}
+	go prom.StartMetricsServer(*metricAddress)
+
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
