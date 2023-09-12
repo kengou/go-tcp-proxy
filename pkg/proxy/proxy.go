@@ -2,9 +2,11 @@ package proxy
 
 import (
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 
+	"github.com/kengou/go-tcp-proxy/pkg/metrics"
 	"k8s.io/klog/v2"
 )
 
@@ -66,8 +68,12 @@ func (p *Proxy) Start() {
 	}
 	if err != nil {
 		klog.Errorf("Remote connection failed: %s", err)
+		// Inbound connection has been closed, so decrement active inbound gauge
+		metrics.DecrementActiveInboundGauge()
 		return
 	}
+	// Outbound connection established, so increment active outbound gauge
+	metrics.IncrementActiveOutboundGauge()
 	defer p.rconn.Close()
 
 	//nagles?
@@ -89,14 +95,19 @@ func (p *Proxy) Start() {
 
 	//wait for close...
 	<-p.errsig
-	klog.Infof("Closed (%d bytes sent, %d bytes recieved)", p.sentBytes, p.receivedBytes)
+	klog.Infof("Closed (%d bytes sent, %d bytes received)", p.sentBytes, p.receivedBytes)
+	// Connection proxying complete, so update all metrics
+	metrics.UpdateBytesReceivedCounter(p.receivedBytes)
+	metrics.UpdateBytesSentCounter(p.sentBytes)
+	metrics.DecrementActiveInboundGauge()
+	metrics.DecrementActiveOutboundGauge()
 }
 
 func (p *Proxy) err(s string, err error) {
 	if p.erred {
 		return
 	}
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		klog.Errorf(s, err)
 	}
 	p.errsig <- true
@@ -110,7 +121,7 @@ func (p *Proxy) pipe(src, dst io.ReadWriter) {
 	if islocal {
 		dataDirection = ">>> %d bytes sent%s"
 	} else {
-		dataDirection = "<<< %d bytes recieved%s"
+		dataDirection = "<<< %d bytes received%s"
 	}
 
 	var byteFormat string

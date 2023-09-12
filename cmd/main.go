@@ -8,7 +8,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kengou/go-tcp-proxy/pkg/metrics"
 	"github.com/kengou/go-tcp-proxy/pkg/proxy"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog/v2"
 )
 
@@ -16,14 +18,24 @@ var (
 	version = "0.0.1"
 	matchid = uint64(0)
 
-	localAddr  = flag.String("l", ":443", "local address")
-	remoteAddr = flag.String("r", fmt.Sprintf("%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS")), "remote address")
-	nagles     = flag.Bool("n", false, "disable nagles algorithm")
-	hex        = flag.Bool("h", false, "output hex")
-	unwrapTLS  = flag.Bool("unwrap-tls", false, "remote connection with TLS exposed unencrypted locally")
-	match      = flag.String("match", "", "match regex (in the form 'regex')")
-	replace    = flag.String("replace", "", "replace regex (in the form 'regex~replacer')")
+	localAddr     = flag.String("l", ":443", "local address")
+	remoteAddr    = flag.String("r", fmt.Sprintf("%s:%s", "kubernetes.default.svc.cluster.local", os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS")), "remote address")
+	metricAddress = flag.String("metrics", "127.0.0.1:3002", "IP address and port number to expose prometheus metrics on")
+	nagles        = flag.Bool("n", false, "disable nagles algorithm")
+	hex           = flag.Bool("h", false, "output hex")
+	unwrapTLS     = flag.Bool("unwrap-tls", false, "remote connection with TLS exposed unencrypted locally")
+	match         = flag.String("match", "", "match regex (in the form 'regex')")
+	replace       = flag.String("replace", "", "replace regex (in the form 'regex~replacer')")
 )
+
+func init() {
+	prometheus.MustRegister(metrics.InboundConnCounter)
+	prometheus.MustRegister(metrics.OutboundConnCounter)
+	prometheus.MustRegister(metrics.InboundBytesCounter)
+	prometheus.MustRegister(metrics.OutboundBytesCounter)
+	prometheus.MustRegister(metrics.ActiveInboundConnGauge)
+	prometheus.MustRegister(metrics.ActiveOutboundConnGauge)
+}
 
 func main() {
 	klog.InitFlags(nil)
@@ -50,6 +62,11 @@ func main() {
 	matcher := createMatcher(*match)
 	replacer := createReplacer(*replace)
 
+	prom := metrics.MetricsHelper{}
+	if err := prom.StartMetricsServer(*metricAddress); err != nil {
+		klog.Errorf("Failed to start metrics server: %s", err)
+		os.Exit(1)
+	}
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -71,6 +88,7 @@ func main() {
 		p.Nagles = *nagles
 		p.OutputHex = *hex
 
+		metrics.IncrementActiveInboundGauge()
 		go p.Start()
 	}
 }
